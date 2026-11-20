@@ -27,13 +27,16 @@ import subprocess
 import sys
 import tempfile
 import time
-import xml.etree.ElementTree as ET
+from xml.parsers import expat
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import collect_diff as cd  # noqa: E402
 
 TAIL_LINES = 40
+MAX_COVERAGE_BYTES = 100 * 1024 * 1024   # refuse absurdly large coverage files
+MAX_GO_RANGE = 100_000                   # lines in one Go coverage block
+MAX_COVERAGE_LINES = 5_000_000           # expanded Go lines per profile
 MAX_SYMBOLS_PER_FILE = 15
 
 
@@ -234,7 +237,7 @@ def parse_coverage(path, kind):
         if path.endswith(".xml"):
             return _cobertura(path)
         return _coveragepy(path)
-    except (OSError, ValueError, ET.ParseError, KeyError):
+    except (OSError, ValueError, expat.ExpatError, KeyError):
         return None
 
 
@@ -260,25 +263,43 @@ def _coveragepy(path):
 
 
 def _cobertura(path):
-    raw = Path(path).read_bytes()
-    if b"<!DOCTYPE" in raw.upper() or b"<!ENTITY" in raw.upper():
+    if Path(path).stat().st_size > MAX_COVERAGE_BYTES:
+        raise ValueError("coverage file too large")
+    # Parse with expat directly and refuse any DTD/entity declaration. This works on the
+    # parsed document in whatever encoding it has (UTF-16 included), unlike a byte search.
+    cov, cur = {}, [None]
+
+    def refuse(*_a):
         raise ValueError("DTD/entity declarations are not accepted in coverage XML")
-    cov = {}
-    for cls in ET.fromstring(raw).iter("class"):
-        m = cov.setdefault(cls.get("filename"), {})
-        for ln in cls.iter("line"):
-            m[int(ln.get("number"))] = int(ln.get("hits", 0))
+
+    def start(tag, attrs):
+        if tag == "class":
+            cur[0] = cov.setdefault(attrs.get("filename"), {})
+        elif tag == "line" and cur[0] is not None:
+            cur[0][int(attrs["number"])] = int(attrs.get("hits", 0))
+
+    p = expat.ParserCreate()
+    p.StartDoctypeDeclHandler = refuse
+    p.EntityDeclHandler = refuse
+    p.StartElementHandler = start
+    p.Parse(Path(path).read_bytes(), True)
     return cov
 
 
 def _go(path):
-    cov = {}
+    cov, total = {}, 0
     for line in Path(path).read_text(encoding="utf-8").splitlines()[1:]:
         m = re.match(r"(.+):(\d+)\.\d+,(\d+)\.\d+ \d+ (\d+)", line)
         if m:
+            start, end, hits = int(m.group(2)), int(m.group(3)), int(m.group(4))
+            if end < start or end - start > MAX_GO_RANGE:
+                continue  # malformed or absurd block: do not expand it
             f = cov.setdefault(m.group(1), {})
-            for n in range(int(m.group(2)), int(m.group(3)) + 1):
-                f[n] = max(f.get(n, 0), int(m.group(4)))
+            for n in range(start, end + 1):
+                f[n] = max(f.get(n, 0), hits)
+            total += end - start + 1
+            if total > MAX_COVERAGE_LINES:
+                raise ValueError("coverage profile too large")
     return cov
 
 

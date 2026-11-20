@@ -236,6 +236,17 @@ class TestSignalsTests(unittest.TestCase):
         bad.write_text('<!DOCTYPE x [<!ENTITY a "b">]><coverage/>')
         self.assertIsNone(ts.parse_coverage(str(bad), None))
 
+    def test_cobertura_doctype_in_utf16_is_rejected(self):
+        f = Path(self.tmp.name) / "u16.xml"
+        f.write_bytes('<?xml version="1.0" encoding="UTF-16"?><!DOCTYPE x [<!ENTITY a "b">]><coverage/>'
+                      .encode("utf-16"))
+        self.assertIsNone(ts.parse_coverage(str(f), None))
+
+    def test_go_profile_range_is_clamped(self):
+        f = Path(self.tmp.name) / "c.out"
+        f.write_text("mode: set\nm/a.go:1.0,999999999.0 1 1\nm/a.go:5.0,2.0 1 1\nm/a.go:3.0,4.0 1 2\n")
+        self.assertEqual(ts.parse_coverage(str(f), "go"), {"m/a.go": {3: 2, 4: 2}})
+
     def test_parse_counts(self):
         self.assertEqual(ts.parse_counts("2 failed, 10 passed, 1 skipped in 0.3s")["passed"], 10)
         self.assertEqual(ts.parse_counts("Tests:       1 failed, 5 passed, 6 total")["failed"], 1)
