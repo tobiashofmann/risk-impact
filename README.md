@@ -18,6 +18,10 @@ An [Agent Skill](https://docs.claude.com/en/docs/claude-code/skills) that assess
 - Asks when the code cannot answer (data volume, consumers, deployment), and marks ratings `provisional` meanwhile.
 - Should run **before a PR or merge**, but can be invoked at any time.
 
+![Example assessment](examples/feature-discount-rules.png)
+
+Example: [report](examples/feature-discount-rules.md), [input JSON](examples/feature-discount-rules.json), [graphic (SVG)](examples/feature-discount-rules.svg). It comes from real runs of the helpers on a small fictional shop project, where the skill finds that the invoice ignores a coupon the cart applied.
+
 ## Install
 
 ```bash
@@ -58,10 +62,19 @@ python3 skills/risk-impact/test_signals.py --cmd "make test" --timeout 900
 
 ```bash
 python3 skills/risk-impact/render_graphic.py docs/risk-impact/feature-x.json --png            # draw the graphic
+python3 skills/risk-impact/render_graphic.py report.json --palette vivid                      # muted (default) | vivid | classic
 python3 skills/risk-impact/render_graphic.py new.json --prev old.json                         # add the earlier run as a faded dot
 ```
 
 The JSON format is described in `SKILL.md` and in the header of `render_graphic.py`.
+
+**Colors:** the level colors (Low, Medium, High, Critical) come from a preset: `muted` (default, Irish green to Portugal red, toned down), `vivid` (full strength) or `classic` (dark tints). Pick one with `--palette` or `"palette"` in the JSON, and override single colors with `"colors"`, for example:
+
+```json
+{ "palette": "vivid", "colors": { "Critical": "#C8102E", "Low": "#009A49" } }
+```
+
+Allowed keys: `Low`, `Medium`, `High`, `Critical`, `raises`, `lowers`, `base`, `track`; values must be `#RRGGBB`. Text on a colored cell switches between white and dark automatically.
 
 `test_signals.py` **executes the project's tests**, which means running repository code. Use `--no-run` if you don't want that.
 

@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1536 972" width="1536" height="972" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" role="img" aria-label="feature/discount-rules: Overall High">
+<title>feature/discount-rules – Overall: High</title>
+<rect width="1536" height="972" fill="#1c1c1b" rx="0"/>
+<rect x="32" y="32" width="1472" height="908" rx="26" fill="#1c1c1b" stroke="#3a3a38" stroke-width="2"/>
+<text x="74" y="100" font-size="31" font-weight="600" fill="#f0efec">feature/discount-rules</text>
+<text x="74" y="134" font-size="23" fill="#a8a8a4">since fork from main · 3 commits · 4 files · +43/−6</text>
+<rect x="1186.5" y="66" width="277.5" height="52" rx="12" fill="#A85823" stroke="#A85823" stroke-width="2"/>
+<rect x="1208.5" y="84.0" width="16" height="16" fill="none" stroke="#ffffff" stroke-width="2.5"/>
+<text x="1240.5" y="101" font-size="26" font-weight="600" fill="#ffffff">Overall: High</text>
+<rect x="116" y="168" width="114" height="114" rx="4" fill="#941826"/>
+<rect x="234" y="168" width="114" height="114" rx="4" fill="#941826"/>
+<rect x="352" y="168" width="114" height="114" rx="4" fill="#941826"/>
+<rect x="470" y="168" width="114" height="114" rx="4" fill="#941826"/>
+<rect x="588" y="168" width="114" height="114" rx="4" fill="#941826"/>
+<rect x="116" y="286" width="114" height="114" rx="4" fill="#A85823"/>
+<rect x="234" y="286" width="114" height="114" rx="4" fill="#A85823"/>
+<rect x="352" y="286" width="114" height="114" rx="4" fill="#A85823"/>
+<rect x="470" y="286" width="114" height="114" rx="4" fill="#A85823"/>
+<rect x="588" y="286" width="114" height="114" rx="4" fill="#941826"/>
+<rect x="116" y="404" width="114" height="114" rx="4" fill="#A28212"/>
+<rect x="234" y="404" width="114" height="114" rx="4" fill="#A28212"/>
+<rect x="352" y="404" width="114" height="114" rx="4" fill="#A28212"/>
+<rect x="470" y="404" width="114" height="114" rx="4" fill="#A85823"/>
+<rect x="588" y="404" width="114" height="114" rx="4" fill="#941826"/>
+<rect x="116" y="522" width="114" height="114" rx="4" fill="#176B42"/>
+<rect x="234" y="522" width="114" height="114" rx="4" fill="#176B42"/>
+<rect x="352" y="522" width="114" height="114" rx="4" fill="#A28212"/>
+<rect x="470" y="522" width="114" height="114" rx="4" fill="#A85823"/>
+<rect x="588" y="522" width="114" height="114" rx="4" fill="#941826"/>
+<rect x="116" y="640" width="114" height="114" rx="4" fill="#176B42"/>
+<rect x="234" y="640" width="114" height="114" rx="4" fill="#176B42"/>
+<rect x="352" y="640" width="114" height="114" rx="4" fill="#A28212"/>
+<rect x="470" y="640" width="114" height="114" rx="4" fill="#A85823"/>
+<rect x="588" y="640" width="114" height="114" rx="4" fill="#941826"/>
+<circle cx="527.0" cy="343.0" r="25" fill="#f0efec" stroke="#111" stroke-width="4"/>
+<text x="527.0" y="350.0" text-anchor="middle" font-size="20" font-weight="700" fill="#111">4</text>
+<text x="173.0" y="782" text-anchor="middle" font-size="20" fill="#a8a8a4">1</text>
+<text x="102" y="232.0" text-anchor="end" font-size="20" fill="#a8a8a4">5</text>
+<text x="291.0" y="782" text-anchor="middle" font-size="20" fill="#a8a8a4">2</text>
+<text x="102" y="350.0" text-anchor="end" font-size="20" fill="#a8a8a4">4</text>
+<text x="409.0" y="782" text-anchor="middle" font-size="20" fill="#a8a8a4">3</text>
+<text x="102" y="468.0" text-anchor="end" font-size="20" fill="#a8a8a4">3</text>
+<text x="527.0" y="782" text-anchor="middle" font-size="20" fill="#a8a8a4">4</text>
+<text x="102" y="586.0" text-anchor="end" font-size="20" fill="#a8a8a4">2</text>
+<text x="645.0" y="782" text-anchor="middle" font-size="20" fill="#a8a8a4">5</text>
+<text x="102" y="704.0" text-anchor="end" font-size="20" fill="#a8a8a4">1</text>
+<text x="409.0" y="816" text-anchor="middle" font-size="22" fill="#f0efec">Business impact</text>
+<text transform="translate(62,461.0) rotate(-90)" text-anchor="middle" font-size="22" fill="#f0efec">Risk</text>
+<text x="74" y="862" font-size="20" fill="#a8a8a4">Dot size = change impact (4/5). Cell = max(risk,</text>
+<text x="74" y="890" font-size="20" fill="#a8a8a4">business).</text>
+<text x="746" y="186" font-size="25" font-weight="600" fill="#f0efec">Risk</text>
+<text x="1459" y="186" text-anchor="end" font-size="25" fill="#f0efec">4/5 · High</text>
+<rect x="746" y="212" width="302" height="20" rx="4" fill="#262625"/>
+<rect x="746" y="212" width="241.6" height="20" rx="4" fill="#8E8E88"/>
+<text x="1066" y="228" font-size="20" fill="#cfcfca">4  Base: money, shared pricing module</text>
+<rect x="746" y="248" width="302" height="20" rx="4" fill="#262625"/>
+<rect x="987.6" y="248" width="60.4" height="20" rx="4" fill="#A85823"/>
+<text x="1066" y="264" font-size="20" fill="#cfcfca">+1  Tax fix without regression test</text>
+<rect x="746" y="284" width="302" height="20" rx="4" fill="#262625"/>
+<rect x="987.6" y="284" width="60.4" height="20" rx="4" fill="#176B42"/>
+<text x="1066" y="300" font-size="20" fill="#cfcfca">−1  Changed lines 95% covered, 7/7 pass</text>
+<text x="746" y="356" font-size="25" font-weight="600" fill="#f0efec">Business impact</text>
+<text x="1459" y="356" text-anchor="end" font-size="25" fill="#f0efec">4/5 · High · mixed</text>
+<rect x="746" y="382" width="302" height="20" rx="4" fill="#262625"/>
+<rect x="746" y="382" width="241.6" height="20" rx="4" fill="#8E8E88"/>
+<text x="1066" y="398" font-size="20" fill="#cfcfca">4  Base: checkout, core feature</text>
+<text x="746" y="454" font-size="25" font-weight="600" fill="#f0efec">Change impact</text>
+<text x="1459" y="454" text-anchor="end" font-size="25" fill="#f0efec">4/5 · High</text>
+<rect x="746" y="480" width="302" height="20" rx="4" fill="#262625"/>
+<rect x="746" y="480" width="181.2" height="20" rx="4" fill="#8E8E88"/>
+<text x="1066" y="496" font-size="20" fill="#cfcfca">3  Base: pricing, discounts, cart</text>
+<rect x="746" y="516" width="302" height="20" rx="4" fill="#262625"/>
+<rect x="927.2" y="516" width="60.4" height="20" rx="4" fill="#A85823"/>
+<text x="1066" y="532" font-size="20" fill="#cfcfca">+1  invoice.py not updated (coupon)</text>
+<rect x="746" y="570" width="16" height="16" rx="3" fill="#8E8E88"/>
+<text x="772" y="584" font-size="19" fill="#a8a8a4">base</text>
+<rect x="846" y="570" width="16" height="16" rx="3" fill="#A85823"/>
+<text x="872" y="584" font-size="19" fill="#a8a8a4">raises</text>
+<rect x="966" y="570" width="16" height="16" rx="3" fill="#176B42"/>
+<text x="992" y="584" font-size="19" fill="#a8a8a4">lowers</text>
+</svg>

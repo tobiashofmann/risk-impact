@@ -18,6 +18,7 @@ Standard library only. PNG needs `cairosvg` or `rsvg-convert` (optional).
 
 Usage:
   render_graphic.py report.json [-o out.svg] [--prev previous-report.json] [--png]
+                    [--palette muted|vivid|classic]
 
 Input JSON (all keys except `title` and `ratings` optional):
 {
@@ -35,8 +36,12 @@ Input JSON (all keys except `title` and `ratings` optional):
   },
   "hotspots": [{"path": "src/price.py", "test_files": 12, "coverage": 40, "lines": 120}],
   "history":  [{"risk": 5, "business": 3, "change": 3}],
-  "labels":   {"risk": "Risiko", ...}     # optional translations, see LABELS
+  "labels":   {"risk": "Risiko", ...},    # optional translations, see LABELS
+  "palette":  "muted",                    # optional preset: muted (default) | vivid | classic
+  "colors":   {"Critical": "#C8102E"}     # optional overrides, #RRGGBB; keys: Low, Medium, High,
+                                          # Critical, raises, lowers, base, track
 }
+Text on a coloured cell is chosen automatically (white or dark) for readable contrast.
 The first step of each rating is its base level; later steps are modifiers
 (positive raises, negative lowers). base + sum(modifiers), clamped to 1..5,
 must equal `score` (a warning is printed otherwise).
@@ -44,6 +49,7 @@ must equal `score` (a warning is printed otherwise).
 import argparse
 import json
 import math
+import re
 import shutil
 import subprocess
 import sys
@@ -66,9 +72,74 @@ LABELS = {
 }
 # palette (dark card; readable on light and dark host pages)
 BG, CARD_STROKE, TEXT, MUTED = "#1c1c1b", "#3a3a38", "#f0efec", "#a8a8a4"
-CELL = {"Low": "#19301a", "Medium": "#3d3418", "High": "#4d3329", "Critical": "#45201f"}
-ACCENT = {"Low": "#3fa34d", "Medium": "#c9a227", "High": "#e8825c", "Critical": "#e5534b"}
-BASE_C, RAISE_C, LOWER_C, TRACK_C = "#8e8e88", "#ec8059", "#13a10e", "#262625"
+# Level colours. Presets (choose with "palette" in the JSON or --palette):
+#   muted   Irish green -> gold -> orange -> Portugal red, toned down (default)
+#   vivid   the same hues at full strength
+#   classic the original dark tints, with bright accents for badge border and bars
+# Individual colours can be overridden with "colors" in the JSON (see PALETTE_KEYS).
+PRESETS = {
+    "muted": {"Low": "#176B42", "Medium": "#A28212", "High": "#A85823", "Critical": "#941826"},
+    "vivid": {"Low": "#169B62", "Medium": "#F4C20D", "High": "#F2761E", "Critical": "#D5112B"},
+    "classic": {"Low": "#19301A", "Medium": "#3D3418", "High": "#4D3329", "Critical": "#45201F",
+                "accent": {"Low": "#3FA34D", "Medium": "#C9A227", "High": "#E8825C", "Critical": "#E5534B"},
+                "raises": "#EC8059", "lowers": "#13A10E"},
+}
+DEFAULT_PALETTE = "muted"
+LEVEL_KEYS = ("Low", "Medium", "High", "Critical")
+PALETTE_KEYS = LEVEL_KEYS + ("raises", "lowers", "base", "track")
+HEX_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
+LIGHT_TEXT, DARK_TEXT = "#ffffff", "#141414"
+
+
+def _lum(h):
+    c = [int(h[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+    c = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4 for x in c]
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+
+
+def readable_on(bg):
+    """White or near-black text, whichever contrasts more with `bg`."""
+    lb = _lum(bg) + 0.05
+    return LIGHT_TEXT if 1.05 / lb >= lb / (_lum(DARK_TEXT) + 0.05) else DARK_TEXT
+
+
+def check_palette(d):
+    """Errors for an unknown preset or invalid colour overrides (values end up in the SVG)."""
+    err = []
+    name = d.get("palette")
+    if name is not None and name not in PRESETS:
+        err.append(f"`palette` must be one of: {', '.join(PRESETS)}")
+    colors = d.get("colors")
+    if colors is not None:
+        if not isinstance(colors, dict):
+            err.append("`colors` must be an object")
+        else:
+            for k, v in colors.items():
+                if k not in PALETTE_KEYS:
+                    err.append(f"colors.{k}: unknown key (allowed: {', '.join(PALETTE_KEYS)})")
+                elif not isinstance(v, str) or not HEX_RE.match(v):
+                    err.append(f"colors.{k}: must be a hex colour like #169B62")
+    return err
+
+
+def build_palette(name=None, colors=None):
+    """Resolve preset + overrides into the colours the drawing code uses."""
+    base = PRESETS[name or DEFAULT_PALETTE]
+    colors = colors or {}
+    cell = {k: colors.get(k, base[k]) for k in LEVEL_KEYS}
+    acc = base.get("accent", {})
+    # an overridden level colour is also its accent; otherwise the preset's accent (or the colour)
+    accent = {k: (cell[k] if k in colors else acc.get(k, cell[k])) for k in LEVEL_KEYS}
+    return {
+        "cell": cell, "accent": accent,
+        "on": {k: readable_on(cell[k]) for k in LEVEL_KEYS},
+        "base": colors.get("base", "#8E8E88"),
+        "track": colors.get("track", "#262625"),
+        "raises": colors.get("raises", base.get("raises", accent["High"])),
+        "lowers": colors.get("lowers", base.get("lowers", accent["Low"])),
+    }
+
+
 FONT = "system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif"
 
 
@@ -98,6 +169,7 @@ def validate(d):
                 warn.append(f"ratings.{k}: steps add up to {max(1, min(5, total))} but score is {s}")
         else:
             warn.append(f"ratings.{k}: no steps, so no breakdown can be drawn")
+    err += check_palette(d)
     if not err:
         mx = max(r[k]["score"] for k in ("risk", "business", "change"))
         ov = d.get("overall")
@@ -163,7 +235,7 @@ def dot_radius(c):
     return 9 + 4 * c
 
 
-def matrix(o, d, L, x0, y0, cw=114, gap=4):
+def matrix(o, d, L, P, x0, y0, cw=114, gap=4):
     r = d["ratings"]
     n = 5
     size = n * cw + (n - 1) * gap
@@ -172,7 +244,7 @@ def matrix(o, d, L, x0, y0, cw=114, gap=4):
             risk, biz = n - ri, ci + 1
             lvl = level_of(max(risk, biz))
             o.append(f'<rect x="{x0 + ci * (cw + gap)}" y="{y0 + ri * (cw + gap)}" width="{cw}" '
-                     f'height="{cw}" rx="4" fill="{CELL[lvl]}"/>')
+                     f'height="{cw}" rx="4" fill="{P["cell"][lvl]}"/>')
 
     def centre(risk, biz):
         return (x0 + (biz - 1) * (cw + gap) + cw / 2, y0 + (n - risk) * (cw + gap) + cw / 2)
@@ -180,8 +252,11 @@ def matrix(o, d, L, x0, y0, cw=114, gap=4):
     for h in d.get("history") or []:
         try:
             cx, cy = centre(h["risk"], h["business"])
-            o.append(f'<circle cx="{cx}" cy="{cy}" r="{dot_radius(h["change"])}" fill="none" '
-                     f'stroke="{TEXT}" stroke-opacity="0.55" stroke-width="2" stroke-dasharray="4 4"/>')
+            rad = dot_radius(h["change"])
+            o.append(f'<circle cx="{cx}" cy="{cy}" r="{rad}" fill="none" stroke="#fff" '
+                     f'stroke-opacity="0.9" stroke-width="5"/>')
+            o.append(f'<circle cx="{cx}" cy="{cy}" r="{rad}" fill="none" stroke="#111" '
+                     f'stroke-width="2" stroke-dasharray="4 4"/>')
         except (KeyError, TypeError):
             continue
     cx, cy = centre(r["risk"]["score"], r["business"]["score"])
@@ -214,7 +289,7 @@ def matrix(o, d, L, x0, y0, cw=114, gap=4):
     return ny + (len(lines) - 1) * 28
 
 
-def breakdown(o, d, L, x, y, w=713, track=302, unit=None):
+def breakdown(o, d, L, P, x, y, w=713, track=302, unit=None):
     unit = unit or track / 5
     label_x = x + track + 18
     for key in ("risk", "business", "change"):
@@ -232,17 +307,17 @@ def breakdown(o, d, L, x, y, w=713, track=302, unit=None):
         for i, st in enumerate(rt.get("steps") or []):
             delta = int(st.get("delta", 0))
             lab = trunc(st.get("label", ""), 36)
-            o.append(f'<rect x="{x}" y="{y}" width="{track}" height="20" rx="4" fill="{TRACK_C}"/>')
+            o.append(f'<rect x="{x}" y="{y}" width="{track}" height="20" rx="4" fill="{P["track"]}"/>')
             if i == 0:
                 new = max(0, min(5, delta))
-                o.append(f'<rect x="{x}" y="{y}" width="{new * unit}" height="20" rx="4" fill="{BASE_C}"/>')
+                o.append(f'<rect x="{x}" y="{y}" width="{new * unit}" height="20" rx="4" fill="{P["base"]}"/>')
                 text = f"{delta}  {lab}"
                 cum = new
             else:
                 new = max(0, min(5, cum + delta))
                 lo, hi = min(cum, new), max(cum, new)
                 if hi > lo:
-                    col = RAISE_C if delta > 0 else LOWER_C
+                    col = P["raises"] if delta > 0 else P["lowers"]
                     o.append(f'<rect x="{x + lo * unit}" y="{y}" width="{(hi - lo) * unit}" height="20" '
                              f'rx="4" fill="{col}"/>')
                 text = f"{'+' if delta > 0 else '−' if delta < 0 else '±'}{abs(delta)}  {lab}"
@@ -253,15 +328,15 @@ def breakdown(o, d, L, x, y, w=713, track=302, unit=None):
     return y
 
 
-def legend(o, L, x, y):
-    for col, key, w in ((BASE_C, "base", 100), (RAISE_C, "raises", 120), (LOWER_C, "lowers", 120)):
+def legend(o, L, P, x, y):
+    for col, key, w in ((P["base"], "base", 100), (P["raises"], "raises", 120), (P["lowers"], "lowers", 120)):
         o.append(f'<rect x="{x}" y="{y}" width="16" height="16" rx="3" fill="{col}"/>')
         o.append(f'<text x="{x + 26}" y="{y + 14}" font-size="19" fill="{MUTED}">{esc(L[key])}</text>')
         x += w
     return y + 30
 
 
-def hotspots(o, d, L, x0, y0, plot_w=586, plot_h=320, right_x=746, right_w=713):
+def hotspots(o, d, L, P, x0, y0, plot_w=586, plot_h=320, right_x=746, right_w=713):
     hs = d["hotspots"]
     maxfan = max([h.get("test_files") or 0 for h in hs] + [6])
     maxlines = max([h.get("lines") or 1 for h in hs] + [1])
@@ -272,7 +347,7 @@ def hotspots(o, d, L, x0, y0, plot_w=586, plot_h=320, right_x=746, right_w=713):
     # danger corner: fan-in >= 3 and coverage < 80%
     fx = px + 3 / maxfan * plot_w
     o.append(f'<rect x="{fx}" y="{py + plot_h * 0.2}" width="{px + plot_w - fx}" height="{plot_h * 0.8}" '
-             f'fill="{CELL["Critical"]}" opacity="0.9"/>')
+             f'fill="{P["accent"]["Critical"]}" opacity="0.38"/>')
 
     def pos(h):
         fan = h.get("test_files") or 0
@@ -287,7 +362,7 @@ def hotspots(o, d, L, x0, y0, plot_w=586, plot_h=320, right_x=746, right_w=713):
     for h in hs:
         cx, cy = pos(h)
         rad = 5 + 11 * math.sqrt((h.get("lines") or 1) / maxlines)
-        col = "#8e8e88" if h.get("coverage") is None else (ACCENT["High"] if h in top[:3] else "#cfcfca")
+        col = "#8e8e88" if h.get("coverage") is None else (P["accent"]["Medium"] if h in top[:3] else "#cfcfca")
         o.append(f'<circle cx="{cx}" cy="{cy}" r="{rad:.1f}" fill="{col}" fill-opacity="0.85" stroke="#111" stroke-width="1.5"/>')
     for i, h in enumerate(top[:4]):
         cx, cy = pos(h)
@@ -319,8 +394,9 @@ def hotspots(o, d, L, x0, y0, plot_w=586, plot_h=320, right_x=746, right_w=713):
     return py + plot_h + 96
 
 
-def render(d, labels_override=None):
+def render(d, palette=None):
     L = {**LABELS, **(d.get("labels") or {})}
+    P = build_palette(palette or d.get("palette"), d.get("colors"))
     r = d["ratings"]
     mx = max(r[k]["score"] for k in ("risk", "business", "change"))
     overall = d.get("overall") or level_of(mx)
@@ -328,15 +404,15 @@ def render(d, labels_override=None):
     X0, Y0 = 116, 168
     # right column first, to know its height
     right = []
-    ry = breakdown(right, d, L, 746, Y0 + 6)
-    ry = legend(right, L, 746, ry - 6)
+    ry = breakdown(right, d, L, P, 746, Y0 + 6)
+    ry = legend(right, L, P, 746, ry - 6)
     left = []
-    ly = matrix(left, d, L, X0, Y0)
+    ly = matrix(left, d, L, P, X0, Y0)
     bottom = max(ly, ry) + 30
     hot = []
     if len(d.get("hotspots") or []) >= 3:
         hy = bottom + 70
-        hb = hotspots(hot, d, L, X0, hy)
+        hb = hotspots(hot, d, L, P, X0, hy)
         hot.insert(0, f'<line x1="74" y1="{bottom + 10}" x2="1462" y2="{bottom + 10}" stroke="{CARD_STROKE}" stroke-width="2"/>')
         bottom = hb + 40
     H = int(bottom + 32 + 20)
@@ -352,10 +428,11 @@ def render(d, labels_override=None):
     badge = f'{L["overall"]}: {L[overall]}' + (f' ({L["provisional"]})' if d.get("provisional") else "")
     bw = max(244, 40 + 15.5 * len(badge) + 36)
     bx = W - 72 - bw
-    col = ACCENT[overall]
-    o.append(f'<rect x="{bx}" y="66" width="{bw}" height="52" rx="12" fill="{CELL[overall]}" stroke="{col}" stroke-width="2"/>')
-    o.append(shape(overall, bx + 30, 92, 16, col))
-    o.append(f'<text x="{bx + 54}" y="101" font-size="26" fill="{TEXT}">{esc(badge)}</text>')
+    fg = P["on"][overall]
+    o.append(f'<rect x="{bx}" y="66" width="{bw}" height="52" rx="12" fill="{P["cell"][overall]}" '
+             f'stroke="{P["accent"][overall]}" stroke-width="2"/>')
+    o.append(shape(overall, bx + 30, 92, 16, fg))
+    o.append(f'<text x="{bx + 54}" y="101" font-size="26" font-weight="600" fill="{fg}">{esc(badge)}</text>')
     o += left + right + hot
     o.append("</svg>")
     return "\n".join(o)
@@ -380,6 +457,8 @@ def main(argv=None):
     ap.add_argument("report")
     ap.add_argument("-o", "--out", help="SVG path (default: next to the JSON)")
     ap.add_argument("--prev", help="previous report JSON; adds it to `history` (and updates the JSON)")
+    ap.add_argument("--palette", choices=sorted(PRESETS),
+                    help=f"colour preset (default: `palette` in the JSON, else {DEFAULT_PALETTE})")
     ap.add_argument("--png", action="store_true", help="also write a PNG (needs cairosvg or rsvg-convert)")
     args = ap.parse_args(argv)
     try:
@@ -402,7 +481,7 @@ def main(argv=None):
             print(f"warning: ignoring --prev ({e})", file=sys.stderr)
     out = Path(args.out) if args.out else Path(args.report).with_suffix(".svg")
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(render(d), encoding="utf-8")
+    out.write_text(render(d, args.palette), encoding="utf-8")
     print(out)
     if args.png:
         png = to_png(out)
