@@ -165,7 +165,13 @@ def detect_command(root, tmp, want_cov):
 
 
 def _py_mod(name):
-    return subprocess.run([sys.executable, "-c", f"import {name}"], capture_output=True).returncode == 0
+    """Is a module importable? Checked without importing it and without looking at the
+    repository: find_spec locates it but does not execute it, and the working directory
+    (a planted pytest.py) is not on the search path."""
+    code = ("import importlib.util, sys; sys.path[:] = [p for p in sys.path if p not in ('', '.')]; "
+            f"sys.exit(0 if importlib.util.find_spec({name!r}) else 1)")
+    return subprocess.run([sys.executable, "-I", "-c", code], cwd=tempfile.gettempdir(),
+                          capture_output=True).returncode == 0
 
 
 def run_tests(argv, root, timeout):
@@ -373,6 +379,8 @@ def collect(args):
         if args.cmd:
             import shlex
             fw, argv = "custom", shlex.split(args.cmd)
+        elif args.no_run:
+            pass  # nothing is executed: no detection, no probing of the repository's tooling
         else:
             fw, argv, cov_file, cov_kind = detect_command(root, tmp, not args.no_coverage)
         if args.no_run:

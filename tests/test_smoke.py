@@ -186,6 +186,16 @@ class TestSignalsTests(unittest.TestCase):
         self.assertEqual(d["tests"]["failed"], 1)
         self.assertTrue(any(s["level"] == "high" and "FAILED" in s["text"] for s in d["signals"]))
 
+    def test_planted_module_is_not_imported(self):
+        # a repo-local pytest.py must neither be imported (module probe) nor run
+        marker = Path(self.tmp.name) / "PWNED"
+        (Path(self.tmp.name) / "pytest.py").write_text(
+            f"open({str(marker)!r}, 'w').write('x')\n")
+        (Path(self.tmp.name) / "conftest.py").write_text("")
+        self.repo.commit({"app.py": APP + "\n\ndef extra():\n    return 0\n"})
+        self.signals("--no-run")
+        self.assertFalse(marker.exists())
+
     def test_no_run(self):
         self.repo.commit({"app.py": APP + "\n\ndef extra():\n    return 0\n"})
         d = self.signals("--no-run")
@@ -269,6 +279,16 @@ class GraphicTests(unittest.TestCase):
         d = json.loads(json.dumps(REPORT))
         d["ratings"]["risk"]["score"] = 2         # steps add up to 4
         self.assertTrue(any("add up" in x for x in rg.validate(d)[1]))
+
+    def test_attribute_injection_is_escaped(self):
+        d = json.loads(json.dumps(REPORT))
+        d["title"] = 'x" onload="alert(1)'
+        d["labels"] = {"overall": '" onclick="evil()'}
+        svg = rg.render(d)
+        self.assertNotIn('" onload="', svg)
+        self.assertNotIn('" onclick="', svg)
+        import xml.etree.ElementTree as ET
+        ET.fromstring(svg)  # still well-formed
 
     def test_escaping_and_truncation(self):
         d = json.loads(json.dumps(REPORT))

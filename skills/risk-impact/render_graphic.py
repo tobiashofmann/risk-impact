@@ -135,7 +135,8 @@ def merge_history(d, prev):
 # ------------------------------------------------------------------ drawing
 
 def esc(s):
-    return escape(str(s))
+    """XML-escape for text nodes AND double/single-quoted attribute values."""
+    return escape(str(s), {'"': "&quot;", "'": "&apos;"})
 
 
 def trunc(s, n):
