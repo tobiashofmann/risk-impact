@@ -320,6 +320,60 @@ class GraphicTests(unittest.TestCase):
         self.assertIn("stroke-dasharray", svg)
         self.assertIn("earlier runs", svg)
 
+    def test_presets_are_valid_and_differ(self):
+        out = {}
+        for name, preset in rg.PRESETS.items():
+            for k in rg.LEVEL_KEYS:
+                self.assertRegex(preset[k], rg.HEX_RE)
+            out[name] = rg.render(json.loads(json.dumps(REPORT)), name)
+        self.assertEqual(len(set(out.values())), len(rg.PRESETS))
+        self.assertIn(rg.PRESETS["vivid"]["High"], out["vivid"])
+        self.assertNotIn(rg.PRESETS["vivid"]["High"], out["classic"])
+
+    def test_palette_from_json_and_cli_override(self):
+        d = json.loads(json.dumps(REPORT))
+        d["palette"] = "vivid"
+        self.assertIn(rg.PRESETS["vivid"]["High"], rg.render(d))
+        self.assertIn(rg.PRESETS["classic"]["High"], rg.render(d, "classic"))  # argument wins
+        self.assertIn(rg.PRESETS["muted"]["High"], rg.render(json.loads(json.dumps(REPORT))))  # default
+
+    def test_color_overrides(self):
+        d = json.loads(json.dumps(REPORT))
+        d["colors"] = {"High": "#123456", "raises": "#abcdef", "track": "#010203"}
+        svg = rg.render(d)
+        for c in ("#123456", "#abcdef", "#010203"):
+            self.assertIn(c, svg)
+        self.assertNotIn(rg.PRESETS["muted"]["High"], svg)
+        self.assertIn(rg.PRESETS["muted"]["Low"], svg)  # untouched levels keep the preset
+
+    def test_invalid_colors_rejected(self):
+        for bad in ({"High": 'red'}, {"High": '#12345'}, {"High": '#fff" onload="x'},
+                    {"Nope": "#123456"}, {"High": None}, "blue"):
+            d = json.loads(json.dumps(REPORT))
+            d["colors"] = bad
+            self.assertTrue(rg.validate(d)[0], bad)
+        d = json.loads(json.dumps(REPORT))
+        d["palette"] = "neon"
+        self.assertTrue(rg.validate(d)[0])
+
+    def test_text_contrast_is_automatic(self):
+        self.assertEqual(rg.readable_on("#F4C20D"), rg.DARK_TEXT)    # bright yellow -> dark text
+        self.assertEqual(rg.readable_on("#941826"), rg.LIGHT_TEXT)   # dark red -> white text
+        self.assertEqual(rg.build_palette("muted", {"Medium": "#FFFF00"})["on"]["Medium"], rg.DARK_TEXT)
+
+    def test_cli_palette_flag(self):
+        with tempfile.TemporaryDirectory() as t:
+            j = Path(t) / "r.json"
+            j.write_text(json.dumps(REPORT))
+            script = str(ROOT / "skills/risk-impact/render_graphic.py")
+            p = subprocess.run([sys.executable, script, str(j), "--palette", "vivid"],
+                               capture_output=True, text=True)
+            self.assertEqual(p.returncode, 0, p.stderr)
+            self.assertIn(rg.PRESETS["vivid"]["High"], (Path(t) / "r.svg").read_text())
+            p = subprocess.run([sys.executable, script, str(j), "--palette", "neon"],
+                               capture_output=True, text=True)
+            self.assertNotEqual(p.returncode, 0)
+
     def test_cli_prev_chain(self):
         with tempfile.TemporaryDirectory() as t:
             t = Path(t)

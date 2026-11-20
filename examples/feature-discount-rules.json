@@ -1,0 +1,29 @@
+{
+  "title": "feature/discount-rules",
+  "scope": "since fork from main · 3 commits · 4 files · +43/−6",
+  "provisional": false,
+  "ratings": {
+    "risk": {
+      "score": 4,
+      "steps": [
+        {"label": "Base: money, shared pricing module", "delta": 4},
+        {"label": "Tax fix without regression test", "delta": 1},
+        {"label": "Changed lines 95% covered, 7/7 pass", "delta": -1}
+      ]
+    },
+    "business": {
+      "score": 4,
+      "direction": "mixed",
+      "steps": [
+        {"label": "Base: checkout, core feature", "delta": 4}
+      ]
+    },
+    "change": {
+      "score": 4,
+      "steps": [
+        {"label": "Base: pricing, discounts, cart", "delta": 3},
+        {"label": "invoice.py not updated (coupon)", "delta": 1}
+      ]
+    }
+  }
+}
