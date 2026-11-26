@@ -5,7 +5,7 @@
 **Scope:** `feature/discount-rules` since fork from `main` · 3 commits · 4 files · +43/−6 lines
 **Overall: High**   Risk 4/5 · Business impact 4/5 · Change impact 4/5
 
-![Risk & impact](feature-discount-rules.svg)
+![Risk & impact](feature-discount-rules.png)
 
 ## Why this change
 Add bulk and coupon discounts to the checkout, and fix tax rounding for invoices. Source: branch name and commit messages (Assumption, not confirmed by the developer). The diff matches it: discounts, their use in `order_total` and `Cart`, and the rounding fix named in a commit message.

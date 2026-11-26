@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2026 Tobias Hofmann
-"""Render the risk & impact assessment as one SVG (optionally PNG).
+"""Render the risk & impact assessment as one PNG (optionally also SVG).
 
 The agent writes the numbers it already works out for the report into a small
 JSON file; this script draws them the same way every time, so graphics from
@@ -14,10 +14,12 @@ Panels:
   3. Hotspots (only if `hotspots` has >= 3 entries): changed files by test
      fan-in (x), changed-line coverage (y), dot size = lines changed.
 
-Standard library only. PNG needs `cairosvg` or `rsvg-convert` (optional).
+Standard library only, but writing the PNG needs `cairosvg` or `rsvg-convert`.
+By default only the PNG is written; --svg also writes the SVG next to it.
+Without a converter and without --svg nothing is drawn (exit code 3).
 
 Usage:
-  render_graphic.py report.json [-o out.svg] [--prev previous-report.json] [--png]
+  render_graphic.py report.json [-o out.png] [--svg] [--prev previous-report.json]
                     [--palette muted|vivid|classic]
 
 Input JSON (all keys except `title` and `ratings` optional):
@@ -438,28 +440,30 @@ def render(d, palette=None):
     return "\n".join(o)
 
 
-def to_png(svg_path):
-    png = str(Path(svg_path).with_suffix(".png"))
+def to_png(svg, png_path):
+    """Write the SVG source `svg` as a PNG; returns False if no converter could do it."""
     try:
         import cairosvg  # type: ignore
-        cairosvg.svg2png(url=str(svg_path), write_to=png)
-        return png
-    except ImportError:
+        cairosvg.svg2png(bytestring=svg.encode("utf-8"), write_to=str(png_path))
+        return True
+    except (ImportError, OSError):    # OSError: package present, native cairo library missing
         pass
     exe = shutil.which("rsvg-convert")
-    if exe and subprocess.run([exe, str(svg_path), "-o", png]).returncode == 0:
-        return png
-    return None
+    if not exe:
+        return False
+    return subprocess.run([exe, "-o", str(png_path)], input=svg.encode("utf-8")).returncode == 0
 
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("report")
-    ap.add_argument("-o", "--out", help="SVG path (default: next to the JSON)")
+    ap.add_argument("-o", "--out",
+                    help="PNG path (default: next to the JSON); the suffix is set to .png (.svg for --svg)")
     ap.add_argument("--prev", help="previous report JSON; adds it to `history` (and updates the JSON)")
     ap.add_argument("--palette", choices=sorted(PRESETS),
                     help=f"colour preset (default: `palette` in the JSON, else {DEFAULT_PALETTE})")
-    ap.add_argument("--png", action="store_true", help="also write a PNG (needs cairosvg or rsvg-convert)")
+    ap.add_argument("--svg", action="store_true", help="also write the SVG next to the PNG")
+    ap.add_argument("--png", action="store_true", help=argparse.SUPPRESS)  # old flag, PNG is the default
     args = ap.parse_args(argv)
     try:
         d = load(args.report)
@@ -479,15 +483,20 @@ def main(argv=None):
             Path(args.report).write_text(json.dumps(d, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         except (OSError, ValueError) as e:
             print(f"warning: ignoring --prev ({e})", file=sys.stderr)
-    out = Path(args.out) if args.out else Path(args.report).with_suffix(".svg")
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(render(d, args.palette), encoding="utf-8")
-    print(out)
-    if args.png:
-        png = to_png(out)
-        print(png if png else "note: no PNG written (install cairosvg or rsvg-convert); the SVG is enough",
-              file=sys.stderr if not png else sys.stdout)
-    return 0
+    out = Path(args.out or args.report)
+    png, svg_path = out.with_suffix(".png"), out.with_suffix(".svg")
+    png.parent.mkdir(parents=True, exist_ok=True)
+    svg = render(d, args.palette)
+    ok = to_png(svg, png)
+    if ok:
+        print(png)
+    if args.svg:
+        svg_path.write_text(svg, encoding="utf-8")
+        print(svg_path)
+    if not ok:
+        print(f"{'warning' if args.svg else 'error'}: no PNG written; install cairosvg or rsvg-convert"
+              + ("" if args.svg else ", or use --svg to get an SVG instead"), file=sys.stderr)
+    return 0 if ok or args.svg else 3
 
 
 if __name__ == "__main__":
