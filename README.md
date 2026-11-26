@@ -85,7 +85,3 @@ Allowed keys: `Low`, `Medium`, `High`, `Critical`, `raises`, `lowers`, `base`, `
 ```bash
 python3 -m unittest discover -s tests -v
 ```
-
-## License
-
-[Apache License 2.0](LICENSE)

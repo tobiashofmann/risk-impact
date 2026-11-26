@@ -11,11 +11,6 @@ Only the latest released version is supported with security fixes.
 
 ## Reporting a Vulnerability
 
-Please report security issues privately via
-[GitHub Security Advisories](https://github.com/tobiashofmann/risk-impact/security/advisories/new),
-not as a public issue.
+Please report security issues privately via [GitHub Security Advisories](https://github.com/tobiashofmann/risk-impact/security/advisories/new), not as a public issue.
 
-Reports are reviewed, but at best effort only; there's no guaranteed response time. If a
-report is confirmed, a fix will be released at some point, either as its own patch or as
-part of a regular update. Where possible, the reporter will be credited in the changelog,
-but that's not guaranteed either.
+Reports are reviewed, but at best effort only; there's no guaranteed response time. If a report is confirmed, a fix will be released at some point, either as its own patch or as part of a regular update. Where possible, the reporter will be credited in the changelog, but that's not guaranteed either.
