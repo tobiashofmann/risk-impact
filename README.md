@@ -13,14 +13,14 @@ An [Agent Skill](https://docs.claude.com/en/docs/claude-code/skills) that assess
   - **Business impact:** how people work with the tool (UI, workflows, API consumers), core features, performance (better or worse), compliance, data.
   - **Change impact:** affected modules, interfaces, data, performance, deployment and operations (found by tracing callers and consumers, not just reading the diff).
 - Takes the **WHY** of the change into account (from you, commits, branch name, tickets; asks if unknown): it shapes the business impact, and a diff that does not match its stated purpose, or an unknown purpose, raises the risk.
-- Presents the result as a **graphic** (SVG, optional PNG): a risk / business-impact matrix with change impact as dot size, bars that show the base level and what raises or lowers each rating, the overall level as a badge, faded dots for earlier runs on the same branch, and for large diffs a hotspot panel (test fan-in vs. changed-line coverage per file). It is drawn by a script from the same numbers as the report, so runs are comparable and image and text cannot disagree.
+- Presents the result as a **graphic** (PNG; SVG on request): a risk / business-impact matrix with change impact as dot size, bars that show the base level and what raises or lowers each rating, the overall level as a badge, faded dots for earlier runs on the same branch, and for large diffs a hotspot panel (test fan-in vs. changed-line coverage per file). It is drawn by a script from the same numbers as the report, so runs are comparable and image and text cannot disagree.
 - Derives an overall level (Low / Medium / High / Critical) and concrete recommendations: tests to add, review focus, rollout and rollback.
 - Asks when the code cannot answer (data volume, consumers, deployment), and marks ratings `provisional` meanwhile.
 - Should run **before a PR or merge**, but can be invoked at any time.
 
 ![Example assessment](examples/feature-discount-rules.png)
 
-Example: [report](examples/feature-discount-rules.md), [input JSON](examples/feature-discount-rules.json), [graphic (SVG)](examples/feature-discount-rules.svg). It comes from real runs of the helpers on a small fictional shop project, where the skill finds that the invoice ignores a coupon the cart applied.
+Example: [report](examples/feature-discount-rules.md), [input JSON](examples/feature-discount-rules.json), [the same graphic as SVG](examples/feature-discount-rules.svg). It comes from real runs of the helpers on a small fictional shop project, where the skill finds that the invoice ignores a coupon the cart applied.
 
 ## Install
 
@@ -36,7 +36,7 @@ Or copy `skills/risk-impact` to `~/.claude/skills/risk-impact` (personal) or `<p
 
 - git
 - Python 3 (standard library only) for the helpers.
-- Optional, for PNG output: `pip install cairosvg` or `rsvg-convert`. The SVG needs nothing.
+- For the graphic (PNG): `pip install cairosvg` or `rsvg-convert`. Without either, only the SVG can be written (`--svg`), which needs nothing.
 - For test results: whatever the project's own tests need. Auto-detected: pytest, unittest, npm (jest/vitest), go, cargo, maven, gradle, rspec, dotnet.
 - For coverage (optional): `pytest-cov` or `coverage` (Python), jest/vitest coverage (lcov), `go test -coverprofile`; or an existing lcov / Cobertura / coverage.py JSON report. Without coverage data the skill says so and judges test depth from the test files.
 
@@ -61,7 +61,8 @@ python3 skills/risk-impact/test_signals.py --cmd "make test" --timeout 900
 ```
 
 ```bash
-python3 skills/risk-impact/render_graphic.py docs/risk-impact/feature-x.json --png            # draw the graphic
+python3 skills/risk-impact/render_graphic.py docs/risk-impact/feature-x.json                  # draw the graphic (PNG)
+python3 skills/risk-impact/render_graphic.py report.json --svg                                # also write the SVG
 python3 skills/risk-impact/render_graphic.py report.json --palette vivid                      # muted (default) | vivid | classic
 python3 skills/risk-impact/render_graphic.py new.json --prev old.json                         # add the earlier run as a faded dot
 ```

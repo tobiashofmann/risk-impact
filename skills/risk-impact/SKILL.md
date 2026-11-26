@@ -11,7 +11,7 @@ Answers three questions about a diff, with evidence from the code, the tests and
 2. **Business impact:** who and what in the business is affected (users and how they work with the tool, core features, processes, revenue, compliance, data, performance)?
 3. **Change impact:** what else in the system is affected (modules, interfaces, data, performance, deployment, operations)?
 
-The result is a **graphic** (an SVG/PNG image) and a short report: 1–5 ratings, the evidence behind each rating, and concrete recommendations (tests, review focus, rollout, rollback). The graphic is always produced; the report text and the graphic come from the same numbers.
+The result is a **graphic** (a PNG image) and a short report: 1–5 ratings, the evidence behind each rating, and concrete recommendations (tests, review focus, rollout, rollback). The graphic is always produced; the report text and the graphic come from the same numbers.
 
 `DIFF`, `TESTS` and `GRAPHIC` below stand for `python3 <skill-dir>/collect_diff.py`, `python3 <skill-dir>/test_signals.py` and `python3 <skill-dir>/render_graphic.py`, where `<skill-dir>` is the directory containing this SKILL.md (e.g. `.claude/skills/risk-impact`, `~/.claude/skills/risk-impact` or `.agents/skills/risk-impact`, depending on how it was installed).
 
@@ -212,14 +212,18 @@ Every assessment ends in one image. It is drawn by `GRAPHIC`, never freehand, so
 **3. Render:**
 
 ```
-GRAPHIC docs/risk-impact/<branch-slug>.json --png [--prev <earlier-copy>.json]
+GRAPHIC docs/risk-impact/<branch-slug>.json [--prev <earlier-copy>.json]
 ```
 
-This writes `<branch-slug>.svg` (and `.png` if `cairosvg` or `rsvg-convert` is available; if neither is, try `pip install cairosvg` only if the user agrees, otherwise the SVG is enough). Fix any `error:` and re-run; read any `warning:` (e.g. the steps do not add up to the score) and correct the JSON rather than ignoring it.
+This writes `<branch-slug>.png` and nothing else. Add `--svg` only if the user asks for an SVG; it then writes `<branch-slug>.svg` in addition to the PNG.
+
+Writing the PNG needs `cairosvg` or `rsvg-convert`. If neither is available (`error: no PNG written`, exit code 3), ask whether you may install one (e.g. `pip install cairosvg`); never install without agreement. If the user declines or it does not work, re-run with `--svg`, use the SVG instead of the PNG everywhere below, and say why there is no PNG. Never present a PNG left over from an earlier run.
+
+Fix any other `error:` and re-run; read any `warning:` (e.g. the steps do not add up to the score) and correct the JSON rather than ignoring it.
 
 What the image shows: a risk (y) / business-impact (x) matrix whose cell color follows `max(risk, business)`, with the dot size and number for change impact; the base level and modifiers behind each rating as bars (base gray, raises orange, lowers green); the overall level as a badge with a shape per level (not color alone); and, when given, the hotspot panel.
 
-The `.json` and `.svg`/`.png` files are new files in the working tree and **are not committed**. Tell the user where they are, so they can commit them or leave them out. The Markdown report is only saved on request (see "Before a PR or merge").
+The `.json` and `.png` files (and the `.svg`, if written) are new files in the working tree and **are not committed**. Tell the user where they are, so they can commit them or leave them out. The Markdown report is only saved on request (see "Before a PR or merge").
 
 ## Report format
 
@@ -231,7 +235,7 @@ Keep it scannable; one screen for small changes, never more than needed.
 **Scope:** <branch> since fork from <base> · <n> commits · <n> files · +<a>/−<d> lines   (or: last commit <sha>)
 **Overall: <Low|Medium|High|Critical>**   Risk <n>/5 · Business impact <n>/5 · Change impact <n>/5
 
-![Risk & impact](<branch-slug>.svg)
+![Risk & impact](<branch-slug>.png)
 
 ## Why this change
 <The WHY in one or two sentences, and its source (user, commit, ticket). Or: "unknown, see open questions".
@@ -273,7 +277,7 @@ Omit a section only if it is truly empty (and say "none identified" for the rate
 
 ## Presenting
 
-1. Show the graphic to the user: if a tool for sending or showing files is available (e.g. SendUserFile or an artifact), hand over the PNG (or the SVG); otherwise state the path of the file. Do not paste SVG source into the chat.
+1. Show the graphic to the user: if a tool for sending or showing files is available (e.g. SendUserFile or an artifact), hand over the PNG; otherwise state the path of the file. If the user asked for an SVG, name or hand over that too. Do not paste SVG source into the chat.
 2. Then give the report in the chat, in the format above (the graphic stands in for a long list of numbers: keep the text to what the image cannot say, such as evidence, WHY, recommendations and open questions).
 3. Name the files that were created and that they are uncommitted.
 
@@ -283,7 +287,7 @@ When this is the pre-PR run:
 
 1. Assess the full branch scope (default).
 2. If the overall level is **High** or **Critical**, or tests fail, say plainly that you recommend resolving or consciously accepting the listed items before opening the PR, and which ones are blocking. The decision stays with the developer.
-3. Offer to save the report to `docs/risk-impact/<branch-slug>.md` next to the graphic (the report embeds the SVG, so it also shows on GitHub/GitLab) or to condense it into a PR description section that links the image. Only write the report file if the user agrees.
+3. Offer to save the report to `docs/risk-impact/<branch-slug>.md` next to the graphic (the report embeds the PNG, so it also shows on GitHub/GitLab) or to condense it into a PR description section that links the image. Only write the report file if the user agrees.
 
 ## Checklist
 

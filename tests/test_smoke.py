@@ -4,13 +4,18 @@
 
 Run from the repo root:  python3 -m unittest discover -s tests -v
 """
+import importlib.util
+import io
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "skills" / "risk-impact" / "collect_diff.py"
@@ -366,7 +371,7 @@ class GraphicTests(unittest.TestCase):
             j = Path(t) / "r.json"
             j.write_text(json.dumps(REPORT))
             script = str(ROOT / "skills/risk-impact/render_graphic.py")
-            p = subprocess.run([sys.executable, script, str(j), "--palette", "vivid"],
+            p = subprocess.run([sys.executable, script, str(j), "--svg", "--palette", "vivid"],
                                capture_output=True, text=True)
             self.assertEqual(p.returncode, 0, p.stderr)
             self.assertIn(rg.PRESETS["vivid"]["High"], (Path(t) / "r.svg").read_text())
@@ -382,13 +387,53 @@ class GraphicTests(unittest.TestCase):
             new["ratings"]["risk"] = {"score": 3, "steps": [{"label": "b", "delta": 3}]}
             (t / "new.json").write_text(json.dumps(new))
             p = subprocess.run([sys.executable, str(ROOT / "skills/risk-impact/render_graphic.py"),
-                                str(t / "new.json"), "--prev", str(t / "old.json")],
+                                str(t / "new.json"), "--svg", "--prev", str(t / "old.json")],
                                capture_output=True, text=True)
             self.assertEqual(p.returncode, 0, p.stderr)
             self.assertTrue((t / "new.svg").exists())
             hist = json.loads((t / "new.json").read_text())["history"]
             self.assertEqual(hist, [{"risk": 5, "business": 5, "change": 5},
                                     {"risk": 4, "business": 3, "change": 2}])
+
+    def run_main(self, *args, converter=True):
+        """Run main() in a temp dir with a fake converter; returns (exit code, files written)."""
+        def fake(svg, png_path):
+            if converter:
+                Path(png_path).write_bytes(b"png")
+            return converter
+
+        with tempfile.TemporaryDirectory() as t:
+            j = Path(t) / "r.json"
+            j.write_text(json.dumps(REPORT))
+            argv = [str(j), *(a.replace("TMP", t) for a in args)]
+            with mock.patch.object(rg, "to_png", fake), redirect_stdout(io.StringIO()), \
+                    redirect_stderr(io.StringIO()):
+                rc = rg.main(argv)
+            return rc, {p.name for p in Path(t).iterdir()} - {"r.json"}
+
+    def test_cli_writes_only_png_by_default(self):
+        self.assertEqual(self.run_main(), (0, {"r.png"}))
+        self.assertEqual(self.run_main("--png"), (0, {"r.png"}))  # old flag still accepted
+
+    def test_cli_svg_flag_writes_both(self):
+        self.assertEqual(self.run_main("--svg"), (0, {"r.png", "r.svg"}))
+
+    def test_cli_out_sets_both_paths(self):
+        for name in ("o.png", "o.svg", "o"):
+            self.assertEqual(self.run_main("-o", f"TMP/{name}"), (0, {"o.png"}), name)
+        self.assertEqual(self.run_main("-o", "TMP/o.png", "--svg"), (0, {"o.png", "o.svg"}))
+
+    def test_cli_without_converter(self):
+        self.assertEqual(self.run_main(converter=False), (3, set()))
+        self.assertEqual(self.run_main("--svg", converter=False), (0, {"r.svg"}))
+
+    @unittest.skipUnless(shutil.which("rsvg-convert") or importlib.util.find_spec("cairosvg"),
+                         "no PNG converter installed")
+    def test_real_png_conversion(self):
+        with tempfile.TemporaryDirectory() as t:
+            png = Path(t) / "r.png"
+            self.assertTrue(rg.to_png(rg.render(json.loads(json.dumps(REPORT))), png))
+            self.assertTrue(png.read_bytes().startswith(b"\x89PNG"))
 
     def test_cli_invalid_exits_2(self):
         with tempfile.TemporaryDirectory() as t:
